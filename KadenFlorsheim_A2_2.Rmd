@@ -1,0 +1,169 @@
+---
+title: "KadenFlorsheim_A2"
+author: "Kaden Florsheim"
+date: "10/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+```{r}
+library(tidyverse)
+library(sf)
+library(tigris)
+library(mapview)
+library(leaflet)
+library(censusapi)
+Sys.setenv(CENSUS_KEY="9fbd5ddd430b595b8f3715733cae2b75c18be92e")
+```
+
+```{r}
+dec_vars_2020 <-
+  listCensusMetadata(
+    name = "2020/dec/pl",
+    type = "variables"
+  )
+nc_pop_2020 <-
+  getCensus(
+    name = "dec/pl",
+    vintage = 2020,
+    region = "block:*", 
+    regionin = "state:06+county:055",
+    vars = "P1_001N"
+  ) %>% 
+  transmute(
+    GEOID20 = paste0(state,county,tract,block),
+    pop_2020 = P1_001N
+  )
+blocks_2020 <- blocks("CA", "Napa County", year = 2020, progress_bar = F)
+```
+
+```{r}
+dec_vars_2010 <-
+  listCensusMetadata(
+    name = "2010/dec/pl",
+    type = "variables"
+  )
+
+nc_pop_2010 <-
+  getCensus(
+    name = "dec/pl",
+    vintage = 2010,
+    region = "block:*", 
+    regionin = "state:06+county:055",
+    vars = "P001001"
+  ) %>% 
+  transmute(
+    GEOID10 =  paste0(state,county,tract,block),
+    pop_2010 = P001001
+  )
+blocks_2010 <- blocks("CA", "Napa County", year = 2010, progress_bar = F)
+```
+
+```{r}
+nc_boundary <- places("CA", progress_bar = F) %>% 
+  filter(NAME == "Napa")
+
+nc_blocks_2010 <- blocks_2010 %>% 
+  st_centroid() %>% 
+  .[nc_boundary, ] %>% 
+  st_drop_geometry() %>% 
+  left_join(blocks_2010 %>% select(GEOID10))%>% 
+  st_as_sf() %>% 
+  select(GEOID10) %>% 
+  left_join(nc_pop_2010)
+
+mapview(nc_boundary) + mapview(nc_blocks_2010, alpha.regions = 0, color = "red", lwd = 2)
+```
+
+##Determine all 2020 blocks that intersect with 2010 blocks.
+```{r}
+nc_blocks_2020 <- blocks_2020 %>%
+  .[nc_boundary, ] %>% 
+  select(GEOID20) %>% 
+  left_join(nc_pop_2020)
+```
+
+```{r}
+nc_blocks_2020_intersect <- nc_blocks_2020 %>% 
+  st_transform(26910) %>% 
+  mutate(original_area = st_area(.)) %>% 
+  st_intersection(
+    nc_blocks_2010 %>%
+      select(GEOID10) %>% 
+      st_transform(26910)
+  ) %>% 
+  mutate(
+    leftover_area = st_area(.),
+    perc_area = as.numeric(leftover_area / original_area),
+    pop_2020 = pop_2020 * perc_area
+  )
+```
+
+```{r}
+nc_blocks_2020_reshaped <- nc_blocks_2020_intersect %>%
+  st_drop_geometry() %>% 
+  group_by(GEOID10) %>% 
+  summarize(
+    pop_2020 = sum(pop_2020, na.rm=T) %>% round()
+  )
+```
+
+#Compute Density in 1000 people per square mile
+```{r}
+projection <- "+proj=utm +zone=10 +ellps=GRS80 +datum=NAD83 +units=ft +no_defs"
+n_pop_2010_2020 <- nc_blocks_2010 %>% 
+  left_join(nc_blocks_2020_reshaped) %>% 
+  mutate(
+    absolute_pop = (pop_2020 - pop_2010) / as.numeric(st_area(.)) * 43560
+  )
+```
+
+```{r}
+absolute_pal <- colorNumeric(
+  palette = "PiYG",
+  domain = n_pop_2010_2020$absolute_pop
+)
+```
+
+```{r}
+leaflet(n_pop_2010_2020) %>% 
+  addProviderTiles(providers$CartoDB.Positron) %>% 
+  addPolygons(
+  fillColor = ~absolute_pal(absolute_pop),
+  color = "black",
+  opacity = 0.5,
+  fillOpacity = 0.75,
+  weight = 0.75,
+  label = ~paste0(round(absolute_pop))
+    ) %>%
+  addLegend(
+    pal = absolute_pal,
+    values = ~absolute_pop,
+    title = "Total Population Change in Napa"
+  )
+```
+
+
+#Key Assumptions:I assumed that everyone living in Napa County participated in the decennial census and that they all answered truthfully. In reality, this most likely was not the case and it is important to understand that the data may be skewed for that reason.
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
