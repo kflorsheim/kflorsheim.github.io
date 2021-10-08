@@ -114,7 +114,7 @@ nc_blocks_2020_reshaped <- nc_blocks_2020_intersect %>%
 #Compute Density in 1000 people per square mile
 ```{r}
 projection <- "+proj=utm +zone=10 +ellps=GRS80 +datum=NAD83 +units=ft +no_defs"
-n_pop_2010_2020 <- n_blocks_2010 %>% 
+n_pop_2010_2020 <- nc_blocks_2010 %>% 
   left_join(nc_blocks_2020_reshaped) %>% 
   mutate(
     absolute_pop = (pop_2020 - pop_2010) / as.numeric(st_area(.)) * 43560
