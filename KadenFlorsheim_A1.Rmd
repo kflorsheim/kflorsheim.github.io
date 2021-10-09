@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
 ```
 
 ```{r}
@@ -60,9 +60,9 @@ for(year in years){
         }
         pge_data_raw <-
         rbind(pge_data_raw,temp)
+        }
     }
   }
-}
 ```
 
 ```{r}
@@ -163,7 +163,6 @@ pge_residential %>%
     yaxis = list(fixedrange = T)
   ) %>%
   config(displayModeBar = F)
-pge_residential
 ```
 
 ```{r}
@@ -195,15 +194,58 @@ pge_commercial %>%
     yaxis = list(fixedrange = T)
   ) %>%
   config(displayModeBar = F)
-pge_commercial
 ```
 
-#The covid epidemic did not appear to have a drastic impact on residental and commercial electricty use or gas use. There was a decline in the usage around early 2020 when most people were quarantining, but the lowest point in 2020 was not drastically lower than the lowest point in years before (2017-2019)
-
-#A caveat of this data is that it is unclear how it was collected. The usage reports and Current Reports do not explain how energy measurments are made and whether customers are reporting the data themselves. I assumed that all the data in these sets were collected consistently and in an accurate manner.  " 
 ```{r}
-pge_chart
+#line gragh 
+pge_data %>%
+  filter(CUSTOMERCLASS %in% c("Elec- Commercial","Gas- Commercial")) %>%
+  filter(YEAR %in% c(2019, 2020)) %>%
+  ggplot() +
+  geom_line(
+    aes(
+      x = DATE,
+      y = TOTALKBTU,
+      color = CUSTOMERCLASS
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  labs(
+    x = "Date",
+    y = "kBTU",
+    title = "PG&E Commercial Yearly Electricity & Gas Usage 2019-2020",
+    color = "Energy Type"
+  ) 
 ```
+
+```{r}
+#line gragh
+pge_data %>%
+  filter(CUSTOMERCLASS %in% c("Elec- Residential","Gas- Residential")) %>%
+  filter(YEAR %in% c(2019, 2020)) %>%
+  ggplot() +
+  geom_line(
+    aes(
+      x = DATE,
+      y = TOTALKBTU,
+      color = CUSTOMERCLASS
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  labs(
+    x = "Date",
+    y = "kBTU",
+    title = "PG&E Residential Yearly Electricity & Gas Usage 2019-2020",
+    color = "Energy Type"
+  ) 
+```
+
+#The covid epidemic did not appear to have a drastic impact on residental and commercial electric use or gas use. For the most part the gas and electric usage for residental and commercial customers remained uniformed and consistent.There was a small plateau around March of 2020 for residential gas and electric usage when most people started quarantining, but the lowest point in between 2019 and 2020 was not drastically lower than the lowest point in years before (2017-2019)
+
+#A caveat of this data is that it is unclear how it was collected. The usage reports and current Reports do not explain how energy measurments were made and whether customers were reporting the data themselves. I assumed that all the data in these sets were collected consistently and in an accurate manner.  
+
 This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
