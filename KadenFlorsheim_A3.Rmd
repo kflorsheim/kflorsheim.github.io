@@ -1,0 +1,174 @@
+---
+title: "KadenFlorsheim_A3"
+author: "Kaden Florsheim"
+date: "10/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+```{r}
+library(tidyverse)
+library(sf)
+library(tigris)
+library(mapview)
+library(leaflet)
+library(censusapi)
+Sys.setenv(CENSUS_KEY="9fbd5ddd430b595b8f3715733cae2b75c18be92e")
+```
+
+```{r}
+temp <- tempfile()
+download.file("https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_hca.zip",destfile = temp)
+
+pums_hca_2019_1yr <- read_csv(unzip(temp,"psam_h06.csv"))
+
+unlink(temp)
+```
+
+
+```{r}
+# Load Pums Data
+pums_2019_1yr <- getCensus(
+  name = "acs/acs1/pums",
+  vintage = 2019,
+  region = "public use microdata area:*", 
+  regionin = "state:06",
+  vars = c(
+    "SERIALNO", #Unique ID for each househole
+    "SPORDER",
+    "PWGTP", #Total number of people
+    "WGTP",
+    "AGEP",  #Age Data
+    "RWAT" #Hot and Cold Running Water Data
+  )
+)
+```
+
+
+```{r}
+# Filter just PUMAs in the Bay Area
+ca_pumas <-
+  pumas("CA", cb = T, progress_bar = F)
+
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+
+bay_pumas <-
+  ca_pumas %>% 
+  st_centroid() %>% 
+  .[bay_counties, ] %>% 
+  st_drop_geometry() %>% 
+  left_join(ca_pumas %>% select(GEOID10)) %>% 
+  st_as_sf()
+
+bay_pums <-
+  pums_2019_1yr %>% 
+  mutate(
+    PUMA = str_pad(public_use_microdata_area,5,"left","0")
+  ) %>% 
+  filter(PUMA %in% bay_pumas$PUMACE10)
+```
+
+```{r}
+# Determining number of people in a PUMA that are over the age of 59 and live without running water
+bay_pums_a <-
+  bay_pums %>% 
+  filter(!duplicated(SERIALNO)) %>% 
+  mutate(
+    PWGTP = as.numeric(PWGTP),
+    Over59_NoRunningWater = ifelse(
+      (AGEP > 59) &
+        (RWAT == 2), #People living without Hot and Cold Running Water
+      PWGTP,
+      0
+    )
+  ) %>% 
+  group_by(PUMA) %>% 
+  summarize(
+    sum_Over59_NoRunningWater =
+      sum(Over59_NoRunningWater, na.rm =T)
+  ) %>% 
+  left_join(
+    bay_pumas %>% 
+      select(PUMACE10),
+    by = c("PUMA" = "PUMACE10")
+  ) %>% 
+  st_as_sf()
+```
+
+
+```{r}
+# Determines Bay Area population over the age of 59 and living without running water
+sum_Over59_NoRunningWater =
+      sum(bay_pums_a$sum_Over59_NoRunningWater)
+```
+
+```{r}
+pums_pal <- colorNumeric(
+  palette = "PuBu",
+  domain = bay_pums_a$sum_Over59_NoRunningWater
+)
+
+leaflet(bay_pums_a) %>%
+  addTiles() %>% 
+  addPolygons(
+    fillColor = ~pums_pal(sum_Over59_NoRunningWater),
+    color = "black",
+    opacity = 0.5,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(sum_Over59_NoRunningWater), 
+      " people over the age of 59 living without running water"
+    ),
+    highlightOptions = highlightOptions(
+      weight = 1,
+      opacity = .5
+    )
+  ) %>% 
+  addLegend(
+    pal = pums_pal,
+    values = ~sum_Over59_NoRunningWater,
+    title = "Population 60 Years and Older Living without Running Water"
+  )
+```
+
+#Overview: According to the CDC, Elderly people (Over the age of 65) and infants are at the greatest risk for heat related illnesses. And one of the most common actions that people take, according to my groups interviews,to avoid heat related illness is drinking water. Elderly people who do not have direct access to drinking water may be at a great risk during a heat wave of developing fatal heat related illnesses. This map reveals which areas have the highest concentrations of older people (60 and above) who do not live with running water. In total there are 3129 residents that fall within the category of being over the age of 59 and not living with running water. Somerset County (08502) had the highest number of residents that fell into this category with 560 people. 
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+``
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
