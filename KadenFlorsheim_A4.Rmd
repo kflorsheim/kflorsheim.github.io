@@ -1,0 +1,108 @@
+---
+title: "KadenFlorsheim_A4"
+author: "Kaden Florsheim"
+date: "10/15/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+```{r}
+library(tidyverse)
+library(sf)
+library(tigris)
+library(mapview)
+library(leaflet)
+library(censusapi)
+Sys.setenv(CENSUS_KEY="9fbd5ddd430b595b8f3715733cae2b75c18be92e")
+```
+
+```{r}
+acs_vars_2019_5yr <- listCensusMetadata(
+  name="2019/acs/acs5",
+  type="variables")
+```
+
+```{r}
+census_race_categories <- 
+  c(
+    "White Alone",
+    "Black or African American",
+    "American Indian and Alaska Native Alone",
+    "Asian Alone",
+    "Native Hawaiian and Other Pacific Islander Alone",
+    "Some Other Race Alone",
+    "Two or More Races"
+  )
+
+napa_education_attainment <-
+  1:7 %>% 
+  map_dfr(function(x){
+    getCensus(
+      name = "acs/acs5",
+      vintage = 2019,
+      region = "county:055",
+      regionin = "state:06",
+      vars = paste0("group(C15002",LETTERS[x],")") 
+    ) %>%
+      select(!c(GEO_ID,state,NAME,county) & !ends_with(c("EA","MA","M"))) %>%
+      pivot_longer(
+        ends_with("E"),
+        names_to = "name",
+        values_to = "estimate"
+      ) %>%
+      left_join(
+        acs_vars_2019_5yr %>% 
+          select(name, label)
+      ) %>% 
+      select(-name) %>% 
+      separate(
+        label,
+        into = c(NA,NA,NA,"education"),
+        sep = "!!"
+      ) %>% 
+      filter(!is.na(education)) %>% 
+      mutate(race = census_race_categories[x])
+  })
+```
+
+```{r}
+bay_race_total <-
+  napa_education_attainment %>% 
+  group_by(race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  mutate(education = "Total")
+
+napa_education_attainment %>% 
+  group_by(education, race) %>% 
+  summarize(estimate = sum(estimate)) %>%
+  rbind(bay_race_total) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = education %>% factor(levels = rev(c("Total",unique(napa_education_attainment$education)))),
+      y = estimate,
+      fill = race %>% factor(levels = rev(unique(napa_education_attainment$race)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x =  "Educational attainment",
+    y = "Proportion of population 25 years or older",
+    title = "Bay Area educational attainment by race",
+    fill = "Race"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+```
