@@ -20,9 +20,11 @@ Sys.setenv(CENSUS_KEY="9fbd5ddd430b595b8f3715733cae2b75c18be92e")
 ```
 
 ```{r}
-acs_vars_2019_5yr <- listCensusMetadata(
-  name="2019/acs/acs5",
-  type="variables")
+acs_vars_2019_5yr <-
+  listCensusMetadata(
+    name = "2019/acs/acs5",
+    type = "variables"
+  )
 ```
 
 ```{r}
@@ -34,7 +36,8 @@ census_race_categories <-
     "Asian Alone",
     "Native Hawaiian and Other Pacific Islander Alone",
     "Some Other Race Alone",
-    "Two or More Races"
+    "Two or More Races",
+    "Latinx"
   )
 
 napa_education_attainment <-
@@ -60,29 +63,29 @@ napa_education_attainment <-
       select(-name) %>% 
       separate(
         label,
-        into = c(NA,NA,NA,"education"),
+        into = c(NA,NA,NA,"educational_attainment"),
         sep = "!!"
       ) %>% 
-      filter(!is.na(education)) %>% 
+      filter(!is.na(educational_attainment)) %>% 
       mutate(race = census_race_categories[x])
   })
 ```
 
 ```{r}
-bay_race_total <-
+napa_race_total <-
   napa_education_attainment %>% 
   group_by(race) %>% 
   summarize(estimate = sum(estimate)) %>% 
-  mutate(education = "Total")
+  mutate(educational_attainment = "Total")
 
 napa_education_attainment %>% 
-  group_by(education, race) %>% 
+  group_by(educational_attainment, race) %>% 
   summarize(estimate = sum(estimate)) %>%
-  rbind(bay_race_total) %>% 
+  rbind(napa_race_total) %>% 
   ggplot() +
   geom_bar(
     aes(
-      x = education %>% factor(levels = rev(c("Total",unique(napa_education_attainment$education)))),
+      x = educational_attainment %>% factor(levels = rev(c("Total",unique(napa_education_attainment$educational_attainment)))),
       y = estimate,
       fill = race %>% factor(levels = rev(unique(napa_education_attainment$race)))
     ),
@@ -92,7 +95,153 @@ napa_education_attainment %>%
   labs(
     x =  "Educational attainment",
     y = "Proportion of population 25 years or older",
-    title = "Bay Area educational attainment by race",
+    title = "Napa County educational attainment by race",
+    fill = "Race"
+  ) +
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+  )  +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
+```
+
+##The majority of Napa's population is white but amongst most races that make up a proportion of the overall population (Including: Black or African American, Asian, Two or More Races), there does not appear to be disproportionate educational attainment in Napa (Amongst people over the age of 25.) However, for people that fall into the category of "Some Other Race Alone" there does appear to be disproportianate educational attainment. Despite making up only around 10 percent of the overall population, they make up over 25% of the Napa population that has attained less than a high school diploma. They also disproportinatly represent a very small percentage of the population that has attained a Bachelor's degree or higher.  
+
+```{r}
+acs_vars_2019_1yr <- listCensusMetadata(
+  name="2019/acs/acs1",
+  type="variables")
+```
+
+
+```{r}
+total_attainment <-
+  getCensus(
+    name = "acs/acs1",
+    vintage = 2019,
+    region = "county:055", 
+    regionin = "state:06",
+    vars = "group(C15002)"
+  ) %>%
+  select(!c(GEO_ID,state,county,NAME) & !ends_with(c("EA","MA","M"))) %>%
+  pivot_longer(
+    ends_with("E"),
+    names_to = "name",
+    values_to = "estimate"
+  ) %>%
+  left_join(
+    acs_vars_2019_1yr %>% 
+      select(name, label)
+  ) %>% 
+  select(-name) %>% 
+  separate(
+    label,
+    into = c(NA,NA,NA,"educational_attainment"),
+    sep = "!!"
+  ) %>% 
+  filter(!is.na(educational_attainment))  %>% 
+  mutate(
+    educational_attainment =
+      case_when(
+        educational_attainment %in% c("Less than 9th grade","9th to 12th grade, no diploma") ~ "Less than high school diploma",
+        educational_attainment %in% c("Some college, no degree","Associate's degree") ~ "Some college or associate's degree",
+        educational_attainment %in% c("High school graduate (includes equivalency)") ~ "High school graduate (includes equivalency)",
+        educational_attainment %in% c("Bachelor's degree","Graduate or professional degree") ~ "Bachelor's degree or higher")) %>%
+  group_by(educational_attainment) %>% 
+      summarize(estimate = sum(estimate)) 
+```        
+
+```{r}
+census_ethnicity_categories <- 
+  c(
+    "White Alone",
+    "Black or African American",
+    "American Indian and Alaska Native Alone",
+    "Asian Alone",
+    "Native Hawaiian and Other Pacific Islander Alone",
+    "Some Other Race Alone",
+    "Two or More Races",
+    "White, Not Latinx",
+    "Latinx"
+  )
+
+napa_l_education_attainment <-
+  8:9 %>% 
+  map_dfr(function(x){
+    getCensus(
+      name = "acs/acs5",
+      vintage = 2019,
+      region = "county:055",
+      regionin = "state:06",
+      vars = paste0("group(C15002",LETTERS[x],")") 
+    ) %>%
+      select(!c(GEO_ID,state,NAME,county) & !ends_with(c("EA","MA","M"))) %>%
+      pivot_longer(
+        ends_with("E"),
+        names_to = "name",
+        values_to = "estimate"
+      ) %>%
+      left_join(
+        acs_vars_2019_5yr %>% 
+          select(name, label)
+      ) %>% 
+      select(-name) %>% 
+      separate(
+        label,
+        into = c(NA,NA,NA,"educational_attainment"),
+        sep = "!!"
+      ) %>% 
+      filter(!is.na(educational_attainment)) %>% 
+      mutate(ethnicity = census_ethnicity_categories[x])
+  })
+```
+
+```{r}
+ethnicity_education_attainment <-
+  napa_l_education_attainment %>% 
+  group_by(educational_attainment, ethnicity) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  rbind(
+    total_attainment %>% 
+      group_by(educational_attainment) %>% 
+      summarize(estimate = sum(estimate)) %>%
+    #pivot_wider(
+    #  names_from = estimate
+     # values_from = estimate
+   # ) %>%
+    mutate(ethnicity = "Not White, not Latinx"))
+```
+
+```{r}
+napa_ethnicity_total <-
+  ethnicity_education_attainment %>% 
+  group_by(ethnicity) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  mutate(educational_attainment = "Total")
+
+ethnicity_education_attainment %>% 
+  group_by(educational_attainment, ethnicity) %>% 
+  summarize(estimate = sum(estimate)) %>%
+  rbind(napa_ethnicity_total) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = educational_attainment %>% factor(levels = rev(c("Total",unique(ethnicity_education_attainment$educational_attainment)))),
+      y = estimate,
+      fill = ethnicity %>% factor(levels = rev(unique(ethnicity_education_attainment$ethnicity)))
+    ),
+    stat = "identity",
+    position = "fill"
+  ) +
+  labs(
+    x =  "Educational attainment",
+    y = "Proportion of population 25 years or older",
+    title = "Napa County educational attainment by ethnicity",
     fill = "Race"
   ) +
   coord_flip() +
