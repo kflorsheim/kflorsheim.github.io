@@ -72,6 +72,28 @@ napa_education_attainment <-
 ```
 
 ```{r}
+napa_education_attainment %>% 
+  group_by(educational_attainment, race) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = educational_attainment,
+      y = estimate,
+      fill = race
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  labs(
+    x = "Household income",
+    y = "Number of households",
+    title = "Bay Area household income by race",
+    fill = "Race of householder"
+  )
+```
+
+```{r}
 napa_race_total <-
   napa_education_attainment %>% 
   group_by(race) %>% 
