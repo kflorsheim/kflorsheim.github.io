@@ -90,7 +90,8 @@ napa_education_attainment %>%
     y = "Number of households",
     title = "Bay Area household income by race",
     fill = "Race of householder"
-  )
+  ) +
+  coord_flip()
 ```
 
 ```{r}
