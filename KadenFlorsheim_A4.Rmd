@@ -189,7 +189,7 @@ census_ethnicity_categories <-
     "Native Hawaiian and Other Pacific Islander Alone",
     "Some Other Race Alone",
     "Two or More Races",
-    "White, Not Latinx",
+    "White_Not_Latinx",
     "Latinx"
   )
 
@@ -219,8 +219,8 @@ napa_l_education_attainment <-
         into = c(NA,NA,NA,"educational_attainment"),
         sep = "!!"
       ) %>% 
-      filter(!is.na(educational_attainment)) %>% 
-      mutate(ethnicity = census_ethnicity_categories[x])
+      filter(!is.na(educational_attainment)) %>%
+      mutate(ethnicity = census_ethnicity_categories[x]) 
   })
 ```
 
@@ -233,11 +233,19 @@ ethnicity_education_attainment <-
     total_attainment %>% 
       group_by(educational_attainment) %>% 
       summarize(estimate = sum(estimate)) %>%
-    #pivot_wider(
-    #  names_from = estimate
-     # values_from = estimate
-   # ) %>%
-    mutate(ethnicity = "Not White, not Latinx"))
+    mutate(ethnicity = "Total")) %>% 
+ pivot_wider(
+    names_from = "ethnicity",
+    values_from = "estimate"
+    ) %>% 
+   mutate(Not_White_Not_Latinx = 
+            Total - Latinx - White_Not_Latinx) %>% 
+  pivot_longer(
+    ends_with("x"),
+        names_to = "ethnicity",
+        values_to = "estimate"
+  )
+  
 ```
 
 ```{r}
@@ -254,7 +262,7 @@ ethnicity_education_attainment %>%
   ggplot() +
   geom_bar(
     aes(
-      x = educational_attainment %>% factor(levels = rev(c("Total",unique(ethnicity_education_attainment$educational_attainment)))),
+      x = educational_attainment %>% factor(levels = rev(c("Total","Bachelor's degree or higher","Some college or associate's degree","High school graduate (includes equivalency)","Less than high school diploma"))),
       y = estimate,
       fill = ethnicity %>% factor(levels = rev(unique(ethnicity_education_attainment$ethnicity)))
     ),
@@ -277,4 +285,27 @@ ethnicity_education_attainment %>%
       reverse = T
     )
   )
+```
+
+```{r}
+ethnicity_education_attainment %>% 
+  group_by(educational_attainment, ethnicity) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = educational_attainment,
+      y = estimate,
+      fill = ethnicity
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  labs(
+    x = "Household income",
+    y = "Number of households",
+    title = "Bay Area household income by race",
+    fill = "Race of householder"
+  ) +
+  coord_flip()
 ```
