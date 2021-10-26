@@ -347,8 +347,8 @@ bay_education_total <-
       mutate(
         ethnicity = "Total",
         education = case_when(
-        educational_attainment %in% c("Less than 9th grade","9th to 12th grade, no diploma") ~ "Less than high school diploma",
-        educational_attainment %in% c("Some college, no degree","Associate's degree") ~ "Some college or associate's degree",
+        educational_attainment %in% c("Less than 9th grade","9th to 12th grade, no diploma") ~ "Less_than_high school_diploma",
+        educational_attainment %in% c("Some college, no degree","Associate's degree") ~ "Some_college_or_associates_degree",
         educational_attainment %in% c("High school graduate (includes equivalency)") ~ "High school graduate (includes equivalency)",
         educational_attainment %in% c("Bachelor's degree","Graduate or professional degree") ~ "Bachelor's degree or higher"
         )
@@ -390,10 +390,10 @@ bay_education_latinx <-
       ) %>% 
       filter(!is.na(educational_attainment)) %>% 
       mutate(
-        ethnicity = "Total",
+        ethnicity = "latinx",
         education = case_when(
-        educational_attainment %in% c("Less than 9th grade","9th to 12th grade, no diploma") ~ "Less than high school diploma",
-        educational_attainment %in% c("Some college, no degree","Associate's degree") ~ "Some college or associate's degree",
+        educational_attainment %in% c("Less than 9th grade","9th to 12th grade, no diploma") ~ "Less_than_high school_diploma",
+        educational_attainment %in% c("Some college, no degree","Associate's degree") ~ "Some_college_or_associates_degree",
         educational_attainment %in% c("High school graduate (includes equivalency)") ~ "High school graduate (includes equivalency)",
         educational_attainment %in% c("Bachelor's degree","Graduate or professional degree") ~ "Bachelor's degree or higher"
         )
@@ -408,26 +408,49 @@ bay_education_latinx <-
 
 ```{r}
 bay_education_ethnicity_trend <- 
-  2006:2019 %>% 
+  bay_education_total %>% 
   rbind(
     bay_education_latinx %>%
       group_by(ethnicity,education,county) %>% 
       summarize(estimate = sum(estimate)) %>% 
-      mutate(education = "educational_atainment")
+      mutate(ethnicity = "Total")
   ) %>% 
   pivot_wider(
-    names_from = c(education, ethnicity),
+    names_from = c(ethnicity, education),
     values_from = estimate
   ) %>% 
   mutate(
-    skew = ((`___` + `___`) / (`___` + `___`)) / (___/___)
-  ) %>% 
+    skew = (('Less_than_high_school_diploma' + 'Some_college_or_associates_degree') / (Total) / (estimate/100))
+    ) %>% 
   left_join(
-    ___ %>% 
-      select(county = ___, name = ___) %>% 
+    acs_vars_2019_1yr %>% 
+      select(county = counties, name = ethnicity) %>% 
       st_drop_geometry()
-  )
+    )
 ```
+
+group_by(educational_attainment, ethnicity) %>% 
+  summarize(estimate = sum(estimate)) %>% 
+  rbind(
+    total_attainment %>% 
+      group_by(educational_attainment) %>% 
+      summarize(estimate = sum(estimate)) %>%
+    mutate(ethnicity = "Total")) %>% 
+ pivot_wider(
+    names_from = "ethnicity",
+    values_from = "estimate"
+    ) %>% 
+   mutate(Not_White_Not_Latinx = 
+            Total - Latinx - White_Not_Latinx) %>% 
+  pivot_longer(
+    ends_with("x"),
+        names_to = "ethnicity",
+        values_to = "estimate"
+  )
+
+
+
+
 ```{r}
 bay_education_ethnicity_chart <- 
   ___ %>% 

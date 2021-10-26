@@ -73,7 +73,7 @@ ces4_map <- ces4_clean %>%
 mapview(ces4_map, zcol = "Asthma")
 ```
 
-##Based on data averaged over 2015-2017, Western Alameda County, Contra Costa County, and Solano County have the highest rates of Emergency Department (ED) visits for Asthma per 10,000 within a population. Based on this, CalEnviroScreen assumes that these counties have the highest concentration of people with Asthma. It should be noted however that the data is likly skewed because it only measures people that have made an ED visit between 2015 and 2017. And in reality the rates of people with Asthma is probably be much higher. 
+#Based on data averaged over 2015-2017, Western Alameda County, Contra Costa County, and Solano County have the highest rates of Emergency Department (ED) visits for Asthma per 10,000 within a population. Based on this, CalEnviroScreen assumes that these counties have the highest concentration of people with Asthma. It should be noted however that the data is likly skewed because it only measures people that have made an ED visit between 2015 and 2017. And in reality the rates of people with Asthma is probably be much higher. 
 
 
 ```{r}
@@ -113,9 +113,7 @@ mapview(ces4_map, zcol = "PM2.5")
 
 ```
 
-## The annual mean concentration (from 2015 to 2017) of 'Particulate matter pollution, and fine particle pollution' (PM2.5) was measured using weighted averages of measured monitor concentrations (measured by monitering sights in California) and satellite observations "derived from Aerosol Optical Depth (AOD) measurements,land use and meteorology data via regression on ground level monitor data." CalEnviroScreen 4.0  The data was also measured in units of µg/m^3.
-
-#The areas that have the highest annual mean concentration of PM2.5 between 2015 and 2017 are Napa County, Oakland, and San Jose. 
+#The annual mean concentration (from 2015 to 2017) of 'Particulate matter pollution, and fine particle pollution' (PM2.5) was measured using weighted averages of measured monitor concentrations (measured by monitering sights in California) and satellite observations "derived from Aerosol Optical Depth (AOD) measurements,land use and meteorology data via regression on ground level monitor data." CalEnviroScreen 4.0  The data was also measured in units of µg/m^3. The areas that have the highest annual mean concentration of PM2.5 between 2015 and 2017 are Napa County, Oakland, and San Jose. 
 
 
 ```{r}
@@ -144,7 +142,7 @@ ggplot(
   )
 ```
 
-##The fitness of the best-fit line appears to not be very fit. Off a first glance the sum of squares of residuals looks like it would be pretty high --> There is a lot of data located far from the best-fit line. 
+#The fitness of the best-fit line appears to not be very fit. Off a first glance the sum of squares of residuals looks like it would be pretty high --> There is a lot of data located far from the best-fit line. 
 
 ```{r}
 model <- lm(Asthma ~ PM2.5, ces4_clean)
@@ -158,7 +156,7 @@ summary(model)
 plot(density(residuals(model)))
 ```
 
-##The mean of the residual should be close to zero and distribution should display itself in a bell-shape. The density curve however is skewed for the residuals.
+#The mean of the residual should be close to zero and distribution should display itself in a bell-shape. The density curve however is skewed for the residuals.
 
 ```{r}
 #with log transformation
@@ -190,4 +188,4 @@ summary(model1)
 plot(density(residuals(model1)))
 ```
 
-#Now the mean of the residual is closer to zero. There are however two peaks in the data, which means that the data is still skewed. 
+#Now the mean of the residual is closer to zero. The data still appears to be skewed because are two peaks and the right tale is a bit longer than the left.
