@@ -71,6 +71,7 @@ napa_education_attainment <-
   })
 ```
 
+
 ```{r}
 napa_education_attainment %>% 
   group_by(educational_attainment, race) %>% 
@@ -78,7 +79,7 @@ napa_education_attainment %>%
   ggplot() +
   geom_bar(
     aes(
-      x = educational_attainment,
+      x = educational_attainment  %>% factor(levels = rev(c("Total","Bachelor's degree or higher","Some college or associate's degree","High school graduate (includes equivalency)","Less than high school diploma"))),
       y = estimate,
       fill = race
     ),
@@ -93,6 +94,7 @@ napa_education_attainment %>%
   ) +
   coord_flip()
 ```
+
 
 ```{r}
 napa_race_total <-
@@ -132,6 +134,7 @@ napa_education_attainment %>%
     )
   )
 ```
+
 
 ##The majority of Napa's population is white but amongst most races that make up a proportion of the overall population (Including: Black or African American, Asian, Two or More Races), there does not appear to be disproportionate educational attainment in Napa (Amongst people over the age of 25.) However, for people that fall into the category of "Some Other Race Alone" there does appear to be disproportianate educational attainment. Despite making up only around 10 percent of the overall population, they make up over 25% of the Napa population that has attained less than a high school diploma. They also disproportinatly represent a very small percentage of the population that has attained a Bachelor's degree or higher.  
 
@@ -224,6 +227,7 @@ napa_l_education_attainment <-
   })
 ```
 
+
 ```{r}
 ethnicity_education_attainment <-
   napa_l_education_attainment %>% 
@@ -245,8 +249,8 @@ ethnicity_education_attainment <-
         names_to = "ethnicity",
         values_to = "estimate"
   )
-  
 ```
+
 
 ```{r}
 napa_ethnicity_total <-
@@ -287,6 +291,7 @@ ethnicity_education_attainment %>%
   )
 ```
 
+
 ```{r}
 ethnicity_education_attainment %>% 
   group_by(educational_attainment, ethnicity) %>% 
@@ -294,7 +299,7 @@ ethnicity_education_attainment %>%
   ggplot() +
   geom_bar(
     aes(
-      x = educational_attainment,
+      x = educational_attainment %>% factor(levels = rev(c("Total","Bachelor's degree or higher","Some college or associate's degree","High school graduate (includes equivalency)","Less than high school diploma"))),
       y = estimate,
       fill = ethnicity
     ),
@@ -308,4 +313,142 @@ ethnicity_education_attainment %>%
     fill = "Race of householder"
   ) +
   coord_flip()
+```
+
+```{r}
+bay_education_total <-
+  2006:2019 %>% 
+  map_dfr(function(x){
+    
+    getCensus(
+      name = "acs/acs1",
+      vintage = x,
+      region = "county:001,013,041,055,075,081,085,095,097",
+      regionin = "state:06",
+      vars = "group(C15002)" 
+    ) %>%
+      select(!c(GEO_ID,state,NAME) & !ends_with(c("EA","MA","M"))) %>%
+      pivot_longer(
+        ends_with("E"),
+        names_to = "name",
+        values_to = "estimate"
+      ) %>%
+      left_join(
+        acs_vars_2019_1yr %>% 
+          select(name, label)
+      ) %>% 
+      select(-name) %>% 
+      separate(
+        label,
+        into = c(NA,NA,NA,"educational_attainment"),
+        sep = "!!"
+      ) %>% 
+      filter(!is.na(educational_attainment)) %>% 
+      mutate(
+        ethnicity = "Total",
+        education = case_when(
+        educational_attainment %in% c("Less than 9th grade","9th to 12th grade, no diploma") ~ "Less than high school diploma",
+        educational_attainment %in% c("Some college, no degree","Associate's degree") ~ "Some college or associate's degree",
+        educational_attainment %in% c("High school graduate (includes equivalency)") ~ "High school graduate (includes equivalency)",
+        educational_attainment %in% c("Bachelor's degree","Graduate or professional degree") ~ "Bachelor's degree or higher"
+        )
+      ) %>%
+      group_by(ethnicity,education,county) %>% 
+      summarize(estimate = sum(estimate)) %>% 
+      mutate(year = x)
+  })
+```
+
+
+```{r}
+bay_education_latinx <-
+  2006:2019 %>% 
+  map_dfr(function(x){
+        
+    getCensus(
+      name = "acs/acs1",
+      vintage = x,
+      region = "county:001,013,041,055,075,081,085,095,097",
+      regionin = "state:06",
+      vars = "group(C15002I)" 
+    ) %>%
+      select(!c(GEO_ID,state,NAME) & !ends_with(c("EA","MA","M"))) %>%
+      pivot_longer(
+        ends_with("E"),
+        names_to = "name",
+        values_to = "estimate"
+      ) %>%
+      left_join(
+        acs_vars_2019_1yr %>% 
+          select(name, label)
+      ) %>% 
+      select(-name) %>% 
+      separate(
+        label,
+        into = c(NA,NA,NA,"educational_attainment"),
+        sep = "!!"
+      ) %>% 
+      filter(!is.na(educational_attainment)) %>% 
+      mutate(
+        ethnicity = "Total",
+        education = case_when(
+        educational_attainment %in% c("Less than 9th grade","9th to 12th grade, no diploma") ~ "Less than high school diploma",
+        educational_attainment %in% c("Some college, no degree","Associate's degree") ~ "Some college or associate's degree",
+        educational_attainment %in% c("High school graduate (includes equivalency)") ~ "High school graduate (includes equivalency)",
+        educational_attainment %in% c("Bachelor's degree","Graduate or professional degree") ~ "Bachelor's degree or higher"
+        )
+      ) %>%
+      group_by(ethnicity,education,county) %>% 
+      summarize(estimate = sum(estimate)) %>% 
+      mutate(year = x)
+  }) %>% 
+  rbind(bay_education_total)
+```
+
+
+```{r}
+bay_education_ethnicity_trend <- 
+  2006:2019 %>% 
+  rbind(
+    bay_education_latinx %>%
+      group_by(ethnicity,education,county) %>% 
+      summarize(estimate = sum(estimate)) %>% 
+      mutate(education = "educational_atainment")
+  ) %>% 
+  pivot_wider(
+    names_from = c(education, ethnicity),
+    values_from = estimate
+  ) %>% 
+  mutate(
+    skew = ((`___` + `___`) / (`___` + `___`)) / (___/___)
+  ) %>% 
+  left_join(
+    ___ %>% 
+      select(county = ___, name = ___) %>% 
+      st_drop_geometry()
+  )
+```
+```{r}
+bay_education_ethnicity_chart <- 
+  ___ %>% 
+  ggplot() +
+  geom_line(
+    aes(
+      x = ___,
+      y = ___,
+      color = ___
+    )
+  ) + 
+  labs(
+    x = "Year",
+    y = "Y",
+    color = "County",
+    title = "Latinx 25+ Population with no college degree",
+    subtitle = "is [Y] times over-represented, relative to % Latinx in overall population"
+  )
+ggplotly(bay_education_ethnicity_chart) %>% 
+  layout(
+    yaxis = list(title = "Multiples over-represented,<br>relative to % Latinx in overall population")
+  ) %>% 
+  config(displayModeBar = F)
 ```

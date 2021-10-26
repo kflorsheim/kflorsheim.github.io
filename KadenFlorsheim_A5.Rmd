@@ -1,0 +1,193 @@
+---
+title: "KadenFlorsheim_A5"
+author: "Kaden Florsheim"
+date: "10/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+```{r}
+library(tidyverse)
+library(censusapi)
+library(sf)
+library(tigris)
+library(mapview)
+
+library(readxl)
+```
+
+```{r}
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+ca_tracts <- tracts("CA", cb = T, progress_bar = F)
+```
+
+```{r}
+#Create Asthma Map in the bay Area
+
+temp <- tempfile()
+download.file("https://oehha.ca.gov/media/downloads/calenviroscreen/document/calenviroscreen40resultsdatadictionaryf2021.zip",destfile = temp)
+
+ces4 <- read_excel("calenviroscreen40resultsdatadictionary_F_2021.xlsx")
+
+colnames(ces4)
+
+ces4_clean <- ces4 %>% 
+  dplyr::select(!ends_with("Pctl"))%>% 
+  filter(`California County` %in% bay_county_names)
+
+sum(is.na(ces4_clean$Poverty))
+
+ces4_clean %>% 
+  # .$Poverty %>%
+  pull(Poverty) %>% 
+  is.na() %>% 
+  sum()
+
+ca_tracts <- tracts("CA")
+
+ces4_map <- ces4_clean %>% 
+  filter(`California County` %in% bay_county_names) %>% 
+  select(`Census Tract`, Asthma) %>% 
+  left_join(
+    ca_tracts %>% 
+      transmute(GEOID = GEOID %>% as.numeric()),
+    by = c("Census Tract" = "GEOID")
+  ) %>% 
+  st_as_sf()
+
+mapview(ces4_map, zcol = "Asthma")
+```
+
+##Based on data averaged over 2015-2017, Western Alameda County, Contra Costa County, and Solano County have the highest rates of Emergency Department (ED) visits for Asthma per 10,000 within a population. Based on this, CalEnviroScreen assumes that these counties have the highest concentration of people with Asthma. It should be noted however that the data is likly skewed because it only measures people that have made an ED visit between 2015 and 2017. And in reality the rates of people with Asthma is probably be much higher. 
+
+
+```{r}
+temp <- tempfile()
+download.file("https://oehha.ca.gov/media/downloads/calenviroscreen/document/calenviroscreen40resultsdatadictionaryf2021.zip",destfile = temp)
+
+ces4 <- read_excel("calenviroscreen40resultsdatadictionary_F_2021.xlsx")
+
+colnames(ces4)
+
+ces4_clean <- ces4 %>% 
+  dplyr::select(!ends_with("Pctl")) %>% 
+  filter(`California County` %in% bay_county_names)
+
+sum(is.na(ces4_clean$Poverty))
+
+ces4_clean %>% 
+  # .$Poverty %>%
+  pull(Poverty) %>% 
+  is.na() %>% 
+  sum() 
+
+
+ca_tracts <- tracts("CA")
+
+ces4_map <- ces4_clean %>% 
+  filter(`California County` %in% bay_county_names) %>% 
+  select(`Census Tract`, PM2.5) %>% 
+  left_join(
+    ca_tracts %>% 
+      transmute(GEOID = GEOID %>% as.numeric()),
+    by = c("Census Tract" = "GEOID")
+  ) %>% 
+  st_as_sf()
+
+mapview(ces4_map, zcol = "PM2.5")
+
+```
+
+## The annual mean concentration (from 2015 to 2017) of 'Particulate matter pollution, and fine particle pollution' (PM2.5) was measured using weighted averages of measured monitor concentrations (measured by monitering sights in California) and satellite observations "derived from Aerosol Optical Depth (AOD) measurements,land use and meteorology data via regression on ground level monitor data." CalEnviroScreen 4.0  The data was also measured in units of µg/m^3.
+
+#The areas that have the highest annual mean concentration of PM2.5 between 2015 and 2017 are Napa County, Oakland, and San Jose. 
+
+
+```{r}
+#Creating line of best fit
+slope <- 0
+yintercept <- mean(ces4_clean$Asthma)
+
+best_fit_candidate <- slope * ces4_clean$PM2.5 + yintercept 
+```
+
+```{r}
+ggplot( 
+  data = ces4_clean,
+  aes(
+    x = PM2.5,
+    y = Asthma
+  )
+) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_line(
+    aes(
+      x = ces4_clean$PM2.5,
+      y = best_fit_candidate 
+    )
+  )
+```
+
+##The fitness of the best-fit line appears to not be very fit. Off a first glance the sum of squares of residuals looks like it would be pretty high --> There is a lot of data located far from the best-fit line. 
+
+```{r}
+model <- lm(Asthma ~ PM2.5, ces4_clean)
+
+summary(model)
+```
+
+#“An increase of 1 unit of PM2.5 is associated with an increase of Asthma by 19.86; “9.6% of the variation in x is explained by the variation in y”.Based on these results I think we can reject the null hypothesis. The p-value is well under .05 at 2.2e-16 and thus there is statistical evidence of a correlation between the two variables. 
+
+```{r}
+plot(density(residuals(model)))
+```
+
+##The mean of the residual should be close to zero and distribution should display itself in a bell-shape. The density curve however is skewed for the residuals.
+
+```{r}
+#with log transformation
+ggplot( 
+  data = ces4_clean,
+  aes(
+    x = PM2.5,
+    y = log(Asthma)
+  )
+) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_line(
+    aes(
+      x = ces4_clean$PM2.5,
+      y = best_fit_candidate 
+    )
+  )
+```
+
+```{r}
+model1 <- lm(log(Asthma) ~ PM2.5, ces4_clean)
+
+summary(model1)
+```
+#“An increase of 1 unit of PM2.5 is associated with an increase of Asthma by 1.4; “10% of the variation in x is explained by the variation in y”
+
+```{r}
+plot(density(residuals(model1)))
+```
+
+#Now the mean of the residual is closer to zero. There are however two peaks in the data, which means that the data is still skewed. 
