@@ -1,0 +1,155 @@
+---
+title: "KadenFlorsheim_A6"
+author: "Kaden Florsheim"
+date: "11/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+```{r}
+library(tidyverse)
+library(sf)
+library(tigris)
+library(mapview)
+library(leaflet)
+library(censusapi)
+Sys.setenv(CENSUS_KEY="9fbd5ddd430b595b8f3715733cae2b75c18be92e")
+```
+
+```{r}
+temp <- tempfile()
+download.file("https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_hca.zip",destfile = temp)
+
+pums_hca_2019_1yr <- read_csv(unzip(temp,"psam_h06.csv"))
+
+unlink(temp)
+```
+
+
+```{r}
+# pums_2019_1yr <- getCensus(
+#   name = "acs/acs1/pums",
+#   vintage = 2019,
+#   region = "public use microdata area:*",
+#   regionin = "state:06",
+#   vars = c(
+#     "SERIALNO",
+#     "SPORDER",
+#     "PWGTP",
+#     "WGTP",
+#     "YBL",
+#     "BLD",
+#     "TEN",
+#     "MV",
+#     "HINCP",
+#     "AGEP"
+#   )
+# )
+# saveRDS(pums_2019_1yr, "a6_pums.rds")
+```
+
+```{r}
+pums_2019_1yr <- readRDS("a6_pums.rds")
+
+ca_pumas <-
+  pumas("CA", cb = T, progress_bar = F)
+
+sf_boundary <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME == "San Francisco")
+
+sf_pumas <-
+  ca_pumas %>% 
+  st_centroid() %>% 
+  .[sf_boundary, ] %>% 
+  st_drop_geometry() %>% 
+  left_join(ca_pumas %>% select(GEOID10)) %>% 
+  st_as_sf()
+```
+
+```{r}
+sf_pums <- pums_2019_1yr %>% 
+  mutate(
+    PUMA = str_pad(public_use_microdata_area,5,"left","0")
+  ) %>% 
+  filter(PUMA %in% sf_pumas$PUMACE10)
+
+sf_pums_clean <- sf_pums %>%
+  mutate(
+    YBL = as.numeric(YBL),
+  ) %>% 
+  filter(YBL %in% 1:3) %>%
+  arrange(as.numeric(AGEP)) %>%
+  group_by(SERIALNO) %>% 
+  summarize_all(first) %>% 
+  mutate(
+    AGEP = as.numeric(AGEP),
+    HINCP = as.numeric(HINCP),
+    leadrisk = ifelse(
+      as.numeric(HINCP) >= 90000 &
+        as.numeric(AGEP) <= 6,
+      1,
+      0
+    )) %>% 
+  mutate(across(
+    c(BLD, TEN, YBL, WGTP, MV, HINCP, PUMA),
+    factor))
+```
+
+```{r}
+logit_model <- glm(
+  leadrisk ~  BLD + TEN  + MV + PUMA,
+  family = quasibinomial(),
+  data = sf_pums_clean
+)
+
+summary(logit_model)
+```
+
+```{r}
+sample_predict <- sample_n(sf_pums_clean, 1)
+
+predict(logit_model, sample_predict, type = "response")
+```
+
+
+```{r}
+predicted_score <- 
+  predict(logit_model, sf_pums_clean, type = "response") 
+
+cbind(sf_pums_clean, predicted_score)
+```
+
+```{r}
+summary_2x2 <-
+  sf_pums_clean %>% 
+  mutate(
+    leadrisk = ifelse(
+      leadrisk == 1, 
+      "Yes (Lead risk)", 
+      "No (No lead risk)"
+    )
+  ) %>% 
+  pull(leadrisk) %>% 
+  table(predicted_score > 0.5)
+```
+
+```{r}
+summary_2x2
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
