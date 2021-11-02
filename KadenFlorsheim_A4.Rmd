@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = F, warning = F, message = F)
 library(tidyverse)
 library(sf)
 library(tigris)
-library(mapview)
+library(plotly)
 library(leaflet)
 library(censusapi)
 Sys.setenv(CENSUS_KEY="9fbd5ddd430b595b8f3715733cae2b75c18be92e")
@@ -81,18 +81,27 @@ napa_education_attainment %>%
     aes(
       x = educational_attainment  %>% factor(levels = rev(c("Total","Bachelor's degree or higher","Some college or associate's degree","High school graduate (includes equivalency)","Less than high school diploma"))),
       y = estimate,
-      fill = race
+      fill = race %>% factor(levels = rev(unique(napa_education_attainment$race)))
     ),
     stat = "identity",
     position = "stack"
   ) +
   labs(
-    x = "Household income",
-    y = "Number of households",
-    title = "Bay Area household income by race",
-    fill = "Race of householder"
+    x = "Education Attainment",
+    y = "Population 25 years or older",
+    title = "Napa educational attainment by race",
+    fill = "Race"
   ) +
-  coord_flip()
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+    ) +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
 ```
 
 
@@ -301,23 +310,34 @@ ethnicity_education_attainment %>%
     aes(
       x = educational_attainment %>% factor(levels = rev(c("Total","Bachelor's degree or higher","Some college or associate's degree","High school graduate (includes equivalency)","Less than high school diploma"))),
       y = estimate,
-      fill = ethnicity
+      fill = ethnicity %>% factor(levels = rev(unique(ethnicity_education_attainment$ethnicity)))
     ),
     stat = "identity",
     position = "stack"
   ) +
   labs(
-    x = "Household income",
-    y = "Number of households",
-    title = "Bay Area household income by race",
-    fill = "Race of householder"
+    x = "Education Attainment",
+    y = "Population 25 years or older",
+    title = "Napa educational attainment by ethnicity",
+    fill = "ethnicity"
   ) +
-  coord_flip()
+  coord_flip() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "vertical"
+    ) +
+  guides(
+    fill = guide_legend(
+      reverse = T
+    )
+  )
 ```
+
+##Latinx people over the age of 25 in Napa county make up the majority of people over the age of 25 that have less than a high school diploma. While the population of non-latinx people increases as you increase the level of educational attainment for latinx people the opposite trend can be observed. 
 
 ```{r}
 bay_education_total <-
-  2018:2019 %>% 
+  2006:2019 %>% 
   map_dfr(function(x){
     
     getCensus(
@@ -347,10 +367,10 @@ bay_education_total <-
       mutate(
         ethnicity = "Total",
         educational_attainment = case_when(
-        educational_attainment %in% c("Less than 9th grade","9th to 12th grade, no diploma","High school graduate (includes equivalency)","Some college, no degree","Associate's degree") ~ "Less_than_college",
-        educational_attainment %in% c("Bachelor's degree","Graduate or professional degree") ~ "College_or_over"
-        )
-      ) %>%
+        educational_attainment %in% c("Less than 9th grade","9th to 12th grade, no diploma") ~ "Less_than_high_school_diploma",
+        educational_attainment %in% c("Some college, no degree","Associate's degree") ~ "Some_college_or_associates_degree",
+        educational_attainment %in% c("High school graduate (includes equivalency)") ~ "High_school_graduate_includes_equivalency",
+        educational_attainment %in% c("Bachelor's degree","Graduate or professional degree") ~ "Bachelors_degree_or_higher")) %>%
       group_by(ethnicity,educational_attainment,county) %>% 
       summarize_all(sum) %>% 
       mutate(year = x)
@@ -360,7 +380,7 @@ bay_education_total <-
 
 ```{r}
 bay_education_latinx <-
-  2018:2019 %>% 
+  2006:2019 %>% 
   map_dfr(function(x){
         
     getCensus(
@@ -390,9 +410,11 @@ bay_education_latinx <-
       mutate(
         ethnicity = "latinx",
         educational_attainment = case_when(
-        educational_attainment %in% c("Less than high school diploma","Some college or associate's degree","High school graduate (includes equivalency)") ~ "Less_than_college",
-        educational_attainment %in% c("Bachelor's degree or higher") ~ "College_or_over")
-      ) %>%
+        educational_attainment %in% "Less than high school diploma" ~ "Less_than_high_school_diploma",
+        
+        educational_attainment %in% "Some college or associate's degree" ~ "Some_college_or_associates_degree",
+        educational_attainment %in% "High school graduate (includes equivalency)" ~ "High_school_graduate_includes_equivalency",
+        educational_attainment %in% "Bachelor's degree or higher" ~ "Bachelors_degree_or_higher")) %>%
       group_by(ethnicity,educational_attainment,county) %>% 
       summarize_all(sum) %>% 
       mutate(year = x)
@@ -402,25 +424,42 @@ bay_education_latinx <-
 
 
 ```{r}
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+```
+
+```{r}
 bay_education_ethnicity_trend <- 
-  bay_education_total %>% 
+  bay_education_latinx %>% 
   rbind(
-    bay_education_latinx %>%
+    bay_education_total %>%
       group_by(ethnicity,educational_attainment,county) %>% 
       summarize(estimate = sum(estimate)) %>% 
       mutate(ethnicity = "Total")) %>% 
   pivot_wider(
-    names_from = c(educational_attainment, county),
+    names_from = c(educational_attainment, ethnicity),
     values_from = estimate
   ) %>% 
   mutate(
-    skew = "Total"
-  
-    #skew = ((Less_than_college) / (College_or_over) / (Total/100))
-    ) %>% 
+    skew = (Less_than_high_school_diploma_latinx + High_school_graduate_includes_equivalency_latinx)/
+     (Less_than_high_school_diploma_Total + High_school_graduate_includes_equivalency_Total) /((Less_than_high_school_diploma_latinx + High_school_graduate_includes_equivalency_latinx + Some_college_or_associates_degree_latinx + Bachelors_degree_or_higher_latinx)/(Less_than_high_school_diploma_Total + High_school_graduate_includes_equivalency_Total + Some_college_or_associates_degree_Total + Bachelors_degree_or_higher_Total)))  %>% #the percent of Latinx out of all people in the lower two education tiers, divided by the percent of Latinx out of all people in the overall population
   left_join(
-    acs_vars_2019_1yr %>% 
-      select(county = counties, name = ethnicity) %>% 
+    bay_counties %>% 
+      select(county = COUNTYFP, name = NAME) %>% 
       st_drop_geometry()
     )
 ```
@@ -428,13 +467,13 @@ bay_education_ethnicity_trend <-
 
 ```{r}
 bay_education_ethnicity_chart <- 
-  ___ %>% 
+  bay_education_ethnicity_trend %>% 
   ggplot() +
   geom_line(
     aes(
-      x = ___,
-      y = ___,
-      color = ___
+      x = year,
+      y = skew,
+      color = county
     )
   ) + 
   labs(
@@ -450,3 +489,5 @@ ggplotly(bay_education_ethnicity_chart) %>%
   ) %>% 
   config(displayModeBar = F)
 ```
+
+##Marin county stands out the largest over-representation of Latix people without a college degree, however in every county Latinx people are over-represented by at least 1.5%
