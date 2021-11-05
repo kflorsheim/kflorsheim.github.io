@@ -89,7 +89,7 @@ sf_pums_clean <- sf_pums %>%
     AGEP = as.numeric(AGEP),
     HINCP = as.numeric(HINCP),
     leadrisk = ifelse(
-      as.numeric(HINCP) >= 90000 &
+      as.numeric(HINCP) <= 90000 &
         as.numeric(AGEP) <= 6,
       1,
       0
@@ -124,6 +124,7 @@ cbind(sf_pums_clean, predicted_score)
 ```
 
 ```{r}
+
 summary_2x2 <-
   sf_pums_clean %>% 
   mutate(
@@ -131,10 +132,26 @@ summary_2x2 <-
       leadrisk == 1, 
       "Yes (Lead risk)", 
       "No (No lead risk)"
-    )
+    ),
+    predicted_leadrisk = ifelse(
+      predicted_score >= .1,
+      as.numeric(WGTP),
+      0
+    ),
+    predicted_noleadrisk = ifelse(
+      predicted_score < .1,
+      as.numeric(WGTP),
+      0
+    ) 
   ) %>% 
-  pull(leadrisk) %>% 
-  table(predicted_score > 0.5)
+  group_by(leadrisk) %>% 
+  summarize(
+    predicted_leadrisk = sum(predicted_leadrisk),
+    predicted_noleadrisk = sum(predicted_noleadrisk)
+  )
+  
+ # pull(leadrisk) %>% 
+ # table(predicted_score > 0.1)
 ```
 
 ```{r}
