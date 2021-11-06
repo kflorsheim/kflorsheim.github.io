@@ -128,7 +128,7 @@ model <- lm(Asthma ~ PM2.5, ces4_clean)
 summary(model)
 ```
 
-#“An increase of 1 unit of PM2.5 is associated with an increase of Asthma by 19.86; “9.6% of the variation in x is explained by the variation in y”.Based on these results I think we can reject the null hypothesis. The p-value is well under .05 at 2.2e-16 and thus there is statistical evidence of a correlation between the two variables. 
+#“An increase of 1 unit of PM2.5 (µg/m^3) is associated with an increase of 19.86 units of Asthma (ED visits per 10,000); “9.6% of the variation in x is explained by the variation in y”.Based on these results I think we can reject the null hypothesis. The p-value is well under .05 at 2.2e-16 and thus there is statistical evidence of a correlation between the two variables. 
 
 ```{r}
 plot(density(residuals(model)))

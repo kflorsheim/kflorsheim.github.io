@@ -15,17 +15,9 @@ library(sf)
 library(tigris)
 library(mapview)
 library(leaflet)
+library(survey)
 library(censusapi)
 Sys.setenv(CENSUS_KEY="9fbd5ddd430b595b8f3715733cae2b75c18be92e")
-```
-
-```{r}
-temp <- tempfile()
-download.file("https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_hca.zip",destfile = temp)
-
-pums_hca_2019_1yr <- read_csv(unzip(temp,"psam_h06.csv"))
-
-unlink(temp)
 ```
 
 
@@ -48,7 +40,7 @@ unlink(temp)
 #     "AGEP"
 #   )
 # )
-# saveRDS(pums_2019_1yr, "a6_pums.rds")
+#saveRDS(pums_2019_1yr, "a6_pums.rds")
 ```
 
 ```{r}
@@ -124,7 +116,6 @@ cbind(sf_pums_clean, predicted_score)
 ```
 
 ```{r}
-
 summary_2x2 <-
   sf_pums_clean %>% 
   mutate(
@@ -158,15 +149,111 @@ summary_2x2 <-
 summary_2x2
 ```
 
+##Households that exceeded the threshold score: BLD- The BLD values generally were either 2 or 3. This suggests that these are typically One-family houses detatched or attatched. TEN- The values were generally either 1 or 3. This suggests that the houses/apartments are either owned with mortgage or loan or they are rented. MV- 2, 3, and 4 were the most common values but there were outliers. This suggests that residents moved into the houses/apartments .13 to 23 months, 2 to 4 years, and 5 to 9 years. The organization would mail out roughly 11 thousand testing kits. Since the many of the homes were single family attatched/detatched, I would expect 80% of the kits to go to low incomes houses with children. Roughly 22 percent of at risk children will recieve kits.One way we can improve our strategy is by sending a postcard to every home the has a BLD value of 2 or sending a postcard to every home with a TEN value of 1 or 3. Using the data that we have we can increase the number of people that get kits.  
 
+```{r}
+sf_boundary <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME == "San Francisco")
 
+ca_pumas <-
+  pumas("CA", cb = T, progress_bar = F)
 
+sf_pumas <-
+  ca_pumas %>% 
+  st_centroid() %>% 
+  .[sf_boundary, ] %>% 
+  st_set_geometry(NULL) %>% 
+  left_join(ca_pumas %>% select(GEOID10)) %>% 
+  st_as_sf()
+```
 
+```{r}
+temp <- tempfile()
+download.file("https://www2.census.gov/programs-surveys/acs/data/pums/2019/1-Year/csv_hca.zip",destfile = temp)
 
+pums_wgtp_2019_1yr <- read_csv(unzip(temp,"psam_h06.csv"))
 
+unlink(temp)
+```
 
+```{r}
+library(readxl)
+library(spdep)
+library(spatialreg)
+```
 
+```{r}
+data <- sf_pums_clean %>%
+  left_join(pums_wgtp_2019_1yr, by = c("SERIALNO")) %>% 
+  select(
+    starts_with("WGTP")
+  ) %>% 
+  select(-WGTP.x,-WGTP.y)
+```
 
+```{r}
+logit_survey_design <- svrepdesign(
+  data = sf_pums_clean,
+  type = "ACS",
+  repweights = data,
+  weights = ~as.numeric(WGTP)
+)
+```
 
+```{r}
+logit_survey_model <- svyglm(
+  formula = leadrisk~ + BLD + TEN  + MV + PUMA,
+  family = quasibinomial(),
+  design = logit_survey_design
+)
+```
 
+```{r}
+summary(logit_survey_model)
+```
 
+```{r}
+sample_predict <- sample_n(sf_pums_clean, 1)
+
+predict(logit_survey_model, sample_predict, type = "response")
+```
+
+```{r}
+predicted_score <- 
+  predict(logit_survey_model, sf_pums_clean, type = "response") 
+
+cbind(sf_pums_clean, predicted_score)
+```
+
+```{r}
+summary_2x2 <-
+  sf_pums_clean %>% 
+  mutate(
+    leadrisk = ifelse(
+      leadrisk == 1, 
+      "Yes (Lead risk)", 
+      "No (No lead risk)"
+    ),
+    predicted_leadrisk = ifelse(
+      predicted_score >= .1,
+      as.numeric(WGTP),
+      0
+    ),
+    predicted_noleadrisk = ifelse(
+      predicted_score < .1,
+      as.numeric(WGTP),
+      0
+    ) 
+  ) %>% 
+  group_by(leadrisk) %>% 
+  summarize(
+    predicted_leadrisk = sum(predicted_leadrisk),
+    predicted_noleadrisk = sum(predicted_noleadrisk)
+  )
+```
+
+```{r}
+summary_2x2
+```
+##The number of kits mailed out increased to 13,000 kits and the number of at risk kids that did not receive kits decreased by 286. I would predict a similar success rate for how many kits would end up at target housholds (70%-80%.) The percent of at risk children likly to be reached would increase by 3% to 25%. 
