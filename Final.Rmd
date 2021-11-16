@@ -1,0 +1,165 @@
+---
+title: "KadenFlorsheimDavidLüdeke_Final"
+author: "Kaden Florsheim"
+date: "11/14/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning = F, message = F)
+```
+
+```{r}
+library(tidyverse)
+library(sf)
+library(tigris)
+library(mapview)
+library(leaflet)
+library(censusapi)
+Sys.setenv(CENSUS_KEY="9fbd5ddd430b595b8f3715733cae2b75c18be92e")
+```
+
+```{r}
+pums_2019_1yr <- getCensus(
+  name = "acs/acs1/pums",
+  vintage = 2019,
+  region = "public use microdata area:*", 
+  regionin = "state:06",
+  vars = c(
+    "SERIALNO", #Unique ID for each househole
+    "SPORDER",
+    "PWGTP", #Total number of people
+    "WGTP",
+    "CPLT",  
+    "FINCP",
+    "RAC1P"
+  )
+)
+```
+
+```{r}
+ca_pumas <-
+  pumas("CA", cb = T, progress_bar = F)
+
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+
+bay_pumas <-
+  ca_pumas %>% 
+  st_centroid() %>% 
+  .[bay_counties, ] %>% 
+  st_drop_geometry() %>% 
+  left_join(ca_pumas %>% select(GEOID10)) %>% 
+  st_as_sf()
+
+bay_pums <-
+  pums_2019_1yr %>% 
+  mutate(
+    PUMA = str_pad(public_use_microdata_area,5,"left","0")
+  ) %>% 
+  filter(PUMA %in% bay_pumas$PUMACE10)
+```
+
+```{r}
+bay_pums_a <-
+  bay_pums %>% 
+  filter(!duplicated(SERIALNO)) %>% 
+  mutate(
+    WGTP = as.numeric(WGTP),
+    Same_sex_household = ifelse(
+      (CPLT == 2)|
+      (CPLT == 4),
+      WGTP,
+      0
+    ),
+    Opposite_sex_household = ifelse(
+      (CPLT == 1)|
+      (CPLT == 3),
+      WGTP,
+      0
+    )) %>%
+  # ) %>%
+  # mutate(
+  #   WGTP = as.numeric(WGTP),
+  #   opposite_sex_household = ifelse(
+  #     (CPLT == 1)|
+  #     (CPLT == 3),
+  #     WGTP,
+  #     0
+  #   )) %>% 
+  # mutate(
+  #  WGTP = as.numeric(WGTP)
+  #  opposite_sex_household = ifelse(
+  #     (CPLT == 1),
+  #     WGTP,
+  #     0 
+  # )) %>% 
+  group_by(PUMA) %>% 
+  summarize(
+    sum_same_sex_household =
+      sum(Same_sex_household, na.rm =T),
+    sum_opposite_sex_household =
+      sum(Opposite_sex_household, na.rm =T)
+  ) %>% 
+  left_join(
+    bay_pumas %>% 
+      select(PUMACE10),
+    by = c("PUMA" = "PUMACE10")
+  ) %>% 
+  st_as_sf()
+```
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
