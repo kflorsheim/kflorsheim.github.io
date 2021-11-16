@@ -152,7 +152,7 @@ pums_bart_clean <-
 obs_matrix <-
   pums_bart_clean %>% 
   ungroup() %>% 
-  select(`2014`,`2015`,`2016`) %>% 
+  select(`2014`,`2015`,`2016`, `2017`) %>% 
   as.matrix()
 
 dist_matrix <- mahalanobis.dist(obs_matrix)
@@ -261,13 +261,10 @@ did_reg <- lm(bart ~ treated*time, data = transit_did)
 
 summary(did_reg)
 ```
-#The Antioch BART station in 2019 had an estimated impact of 970 new BART commuters. This positive effect size does seem to be statistically significant because the p-value is 2.1093-06 (well under 5%.) 
+#The Antioch BART station in 2019 had an estimated impact of 1100 new BART commuters. This positive effect size does seem to be statistically significant because the p-value is 7.327e-15 (well under 5%.) 
 
 #The Antioch BART station appears to have a higher and more statistically significant positive effect size than the Milpitas BART station. On the '[Antioch/Milpitas] vs control neigborhoods, Bart ridership' graghs, there is an observable incline in BART ridership in both treated Pumas the year that the station opens. The Milpitas ridership however decreases during the first post-treatment year and the Antioch ridership stays the same.There are many confounding factors that may have contributed to this decrease, including the opening of the Antioch BART. A weakness of this comparrison is that there is only one year of post-treatmet data for the Antioch Bart station. Another weekness is that PUMAs do not provide particularly granular data. Since we chose different Pumas to treat, The Puma that we treated for Milpitas may have been too big to observe a statistically significant result or may have not been the best Puma to use.
 
-
-    
-    
 
 
 
