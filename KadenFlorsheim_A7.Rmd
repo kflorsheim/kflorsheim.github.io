@@ -145,14 +145,13 @@ pums_bart_clean <-
     names_from = year,
     values_from = bart
   )
-
 ```
 
 ```{r}
 obs_matrix <-
   pums_bart_clean %>% 
   ungroup() %>% 
-  select(`2014`,`2015`,`2016`, `2017`) %>% 
+  select(`2014`,`2015`,`2016`,`2017`) %>% 
   as.matrix()
 
 dist_matrix <- mahalanobis.dist(obs_matrix)
@@ -265,15 +264,73 @@ summary(did_reg)
 
 #The Antioch BART station appears to have a higher and more statistically significant positive effect size than the Milpitas BART station. On the '[Antioch/Milpitas] vs control neigborhoods, Bart ridership' graghs, there is an observable incline in BART ridership in both treated Pumas the year that the station opens. The Milpitas ridership however decreases during the first post-treatment year and the Antioch ridership stays the same.There are many confounding factors that may have contributed to this decrease, including the opening of the Antioch BART. A weakness of this comparrison is that there is only one year of post-treatmet data for the Antioch Bart station. Another weekness is that PUMAs do not provide particularly granular data. Since we chose different Pumas to treat, The Puma that we treated for Milpitas may have been too big to observe a statistically significant result or may have not been the best Puma to use.
 
+```{r}
+pums_replicates <- 
+  1:80 %>% 
+  map_dfr(function(x){
+    pums_2014_2019 %>% 
+      rename(replicate = paste0("PWGTP", x)) %>%
+      mutate(
+        PWGTP = as.numeric(replicate),
+        bart = ifelse(
+          JWTR %in% c("4"),
+          (PWGTP),
+          0
+          )
+        ) %>% 
+      group_by(PUMA, year) %>% 
+      summarize(
+        pop = sum(PWGTP),
+        bart = sum(bart)
+        ) %>% 
+      filter(
+        PUMA %in% match$PUMA
+      ) %>% 
+      mutate(
+        year = year %>% as.numeric(),
+        time = ifelse(year >= 2018, 1, 0),
+        treated = ifelse(PUMA == "01309", 1, 0)
+  ) %>% 
+    lm(bart ~ treated*time, data = .,) %>% 
+      .$coefficients %>% 
+      as.data.frame() %>% 
+      rownames_to_column()
+  }) 
+```
+
+
+```{r}
+weighted_model_summary <- pums_replicates %>% 
+  rename(replicate = ".") %>% 
+  left_join(
+    did_reg$coefficients %>% 
+      as.data.frame() %>% 
+      rownames_to_column() %>% 
+      rename(base = ".")
+  ) %>% 
+  group_by(rowname) %>% 
+  summarize(
+    stderr = sqrt(4/80*sum((base-replicate)^2)), 
+    base = first(base)) %>%  
+      select(
+        rowname,
+        base,
+        stderr 
+      ) %>% 
+  mutate(
+    t_value = base/stderr
+  )
+```
 
 
 
-
-
-
-
-
-
+```{r}
+qt(p=.05, df=62, lower.tail=FALSE) #critical t-value
+```
+```{r}
+1097.225/493.96325 #t-value
+```
+##The t-value calculated above is higher than the critical t-value which further suggests that the results are statistically significant.
 
 
 

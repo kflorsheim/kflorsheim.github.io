@@ -26,10 +26,11 @@ pums_2019_1yr <- getCensus(
   region = "public use microdata area:*", 
   regionin = "state:06",
   vars = c(
-    "SERIALNO", #Unique ID for each househole
+    "SERIALNO", #Unique ID for each household
     "SPORDER",
     "PWGTP", #Total number of people
     "WGTP",
+    "HINCP",
     "CPLT",  
     "FINCP",
     "RAC1P"
@@ -75,62 +76,113 @@ bay_pums <-
 ```
 
 ```{r}
-bay_pums_a <-
-  bay_pums %>% 
-  filter(!duplicated(SERIALNO)) %>% 
+cleaned <- bay_pums %>%
+  mutate(
+    SPORDER = as.numeric(SPORDER),
+    CPLT = as.numeric(CPLT)
+  ) %>% 
+  filter(
+    (SPORDER %in% 1:2), #assuming person 1 and 2 are the partners
+    (CPLT %in% 1:4)) #filtering out N/A
+```
+
+```{r}
+bay_pums_couple <-
+  cleaned %>%
   mutate(
     WGTP = as.numeric(WGTP),
+    partner1 = ifelse(
+      (SPORDER == 1),
+      WGTP,
+      0
+    ),
+    partner2 = ifelse(
+      (SPORDER == 2),
+      WGTP,
+      0
+    ),
     Same_sex_household = ifelse(
-      (CPLT == 2)|
-      (CPLT == 4),
+      (HINCP < 100000) &
+        (CPLT == 2)|(CPLT == 4), 
+        
       WGTP,
       0
     ),
     Opposite_sex_household = ifelse(
-      (CPLT == 1)|
-      (CPLT == 3),
+      (HINCP < 100000) &
+        (CPLT == 1)|(CPLT == 3),
       WGTP,
       0
-    )) %>%
-  # ) %>%
-  # mutate(
-  #   WGTP = as.numeric(WGTP),
-  #   opposite_sex_household = ifelse(
-  #     (CPLT == 1)|
-  #     (CPLT == 3),
-  #     WGTP,
-  #     0
-  #   )) %>% 
-  # mutate(
-  #  WGTP = as.numeric(WGTP)
-  #  opposite_sex_household = ifelse(
-  #     (CPLT == 1),
-  #     WGTP,
-  #     0 
-  # )) %>% 
-  group_by(PUMA) %>% 
+    ),
+    White = ifelse(
+      (SERIALNO == 1) &
+      (RAC1P == 1),
+      WGTP,
+      0
+    )
+    
+    
+    ) %>%
   summarize(
     sum_same_sex_household =
       sum(Same_sex_household, na.rm =T),
     sum_opposite_sex_household =
-      sum(Opposite_sex_household, na.rm =T)
+      sum(Opposite_sex_household, na.rm =T),
+    partner1 =
+      sum(partner1, na.rm =T),
+    partner2 =
+      sum(partner2, na.rm =T)
   ) %>% 
-  left_join(
-    bay_pumas %>% 
-      select(PUMACE10),
-    by = c("PUMA" = "PUMACE10")
+  mutate(across(
+    c(HINCP, PUMA),
+    factor))
   ) %>% 
   st_as_sf()
 ```
 
 ```{r}
 
+
+
+
+
 ```
 
 
+```{r}
+acs_vars_2019_5yr <-
+  listCensusMetadata(
+    name = "2019/acs/acs5",
+    type = "variables"
+  )
+```
 
 
+```{r}
+veteran <-
+    getCensus(
+      name = "acs/acs5",
+      vintage = 2019,
+      region = "county:055",
+      regionin = "state:06",
+      vars = "group(S2101)" 
+    ) %>%
+      select(!c(GEO_ID,state,NAME,county) & !ends_with(c("EA","MA","M"))) %>%
+      pivot_longer(
+        ends_with("E"),
+        names_to = "name",
+        values_to = "estimate"
+      ) %>%
+      left_join(
+        acs_vars_2019_5yr %>% 
+          select(name, label)
+      )
+```
 
+##How would we filter out just first two people to determine their races? Is sample size too small?
+
+
+##Veterans, Jobs, Race< which war, income
 
 
 
