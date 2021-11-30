@@ -328,9 +328,9 @@ weighted_model_summary <- pums_replicates %>%
 qt(p=.05, df=62, lower.tail=FALSE) #critical t-value
 ```
 ```{r}
-1097.225/493.96325 #t-value
+1097.225/493.96325 #base/stderr= t-value 
 ```
-##The t-value calculated above is higher than the critical t-value which further suggests that the results are statistically significant.
+##The standard error is 493.96325 and the t-value calculated above is higher than the critical t-value which further suggests that the results are statistically significant.
 
 
 
