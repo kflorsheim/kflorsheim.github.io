@@ -31,8 +31,9 @@ pums_2019_1yr <- getCensus(
     "PWGTP", #Total number of people
     "WGTP",
     "HINCP",
-    "CPLT",  
+    "CPLT",
     "FINCP",
+    "PINCP",
     "RAC1P"
   )
 )
@@ -67,16 +68,16 @@ bay_pumas <-
   left_join(ca_pumas %>% select(GEOID10)) %>% 
   st_as_sf()
 
-bay_pums <-
+ca_pums <-
   pums_2019_1yr %>% 
   mutate(
     PUMA = str_pad(public_use_microdata_area,5,"left","0")
   ) %>% 
-  filter(PUMA %in% bay_pumas$PUMACE10)
+  filter(PUMA %in% ca_pumas$PUMACE10)
 ```
 
 ```{r}
-cleaned <- bay_pums %>%
+cleaned <- ca_pums %>%
   mutate(
     SPORDER = as.numeric(SPORDER),
     CPLT = as.numeric(CPLT)
@@ -84,6 +85,119 @@ cleaned <- bay_pums %>%
   filter(
     (SPORDER %in% 1:2), #assuming person 1 and 2 are the partners
     (CPLT %in% 1:4)) #filtering out N/A
+```
+
+```{r}
+bay_pums_couple <-
+  cleaned %>%
+  mutate(
+    WGTP = as.numeric(WGTP),
+    Same_sex_household = ifelse(
+        (CPLT == 2)|(CPLT == 4), 
+        
+      1,
+      0
+    ),
+    Opposite_sex_household = ifelse(
+        (CPLT == 1)|(CPLT == 3),
+      1,
+      0
+    ),
+    White_Low_Income = ifelse(
+      (RAC1P == 1) & (HINCP > 100000),
+      1,
+      0
+    ),
+    Not_White_Low_Income = ifelse(
+      (RAC1P != 1) & (HINCP > 100000),
+      1,
+      0)) 
+```
+
+```{r}
+bay_pums_couple <-
+  cleaned %>% 
+  Same_sex_household = ifelse(
+        (CPLT == 2)|(CPLT == 4), 
+        WGTP,
+        0)
+# %>% 
+  # group_by(PUMA) %>% 
+  # summarize(
+  #   PERSON1 =
+  #     sum(Person1, na.rm =T)
+  # ) 
+```
+```
+
+```{r}
+bay_pums_couple <-
+  cleaned %>%
+  mutate(
+    WGTP = as.numeric(WGTP),
+    SPORDER = as.numeric(SPORDER),
+    partner1 = ifelse(
+      (SPORDER == 1),
+      WGTP,
+      0
+    ),
+    partner2 = ifelse(
+      (SPORDER == 2),
+      WGTP,
+      0
+    ) %>% 
+  group_by(PUMA) %>%
+  summarize(
+    partner1 =
+      sum(partner1, na.rm =T),
+    partner2 =
+      sum(partner2, na.rm =T))
+  )
+```
+
+
+
+    
+    ,
+    Same_sex_household = ifelse(
+      (HINCP < 100000) &
+        (CPLT == 2)|(CPLT == 4), 
+        
+      WGTP,
+      0
+    ),
+    Opposite_sex_household = ifelse(
+      (HINCP < 100000) &
+        (CPLT == 1)|(CPLT == 3),
+      WGTP,
+      0
+    ),
+    White = ifelse(
+      (SERIALNO == 1) &
+      (RAC1P == 1),
+      WGTP,
+      0
+    )
+    
+    
+    ) %>% 
+  group_by(PUMA) %>%
+  summarize(
+    sum_same_sex_household =
+      sum(Same_sex_household, na.rm =T),
+    sum_opposite_sex_household =
+      sum(Opposite_sex_household, na.rm =T),
+    partner1 =
+      sum(partner1, na.rm =T),
+    partner2 =
+      sum(partner2, na.rm =T)%>% 
+  left_join(
+    bay_pumas %>% 
+      select(PUMACE10),
+    by = c("PUMA" = "PUMACE10")
+  ) %>% 
+  st_as_sf()
+  ) 
 ```
 
 ```{r}
@@ -121,27 +235,6 @@ bay_pums_couple <-
       0
     )
     
-    
-    ) %>%
-  summarize(
-    sum_same_sex_household =
-      sum(Same_sex_household, na.rm =T),
-    sum_opposite_sex_household =
-      sum(Opposite_sex_household, na.rm =T),
-    partner1 =
-      sum(partner1, na.rm =T),
-    partner2 =
-      sum(partner2, na.rm =T)
-  ) %>% 
-  mutate(across(
-    c(HINCP, PUMA),
-    factor))
-  ) %>% 
-  st_as_sf()
-```
-
-```{r}
-
 
 
 
