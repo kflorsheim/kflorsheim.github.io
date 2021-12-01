@@ -81,8 +81,8 @@ sf_pums_clean <- sf_pums %>%
     AGEP = as.numeric(AGEP),
     HINCP = as.numeric(HINCP),
     leadrisk = ifelse(
-      as.numeric(HINCP) <= 90000 &
-        as.numeric(AGEP) <= 6,
+      as.numeric(HINCP) < 90000 &
+        as.numeric(AGEP) < 6,
       1,
       0
     )) %>% 
@@ -130,7 +130,7 @@ summary_2x2 <-
       0
     ),
     predicted_noleadrisk = ifelse(
-      predicted_score <= .1,
+      predicted_score < .1,
       as.numeric(WGTP),
       0
     ) 
@@ -203,7 +203,7 @@ logit_survey_design <- svrepdesign(
 
 ```{r}
 logit_survey_model <- svyglm(
-  formula = leadrisk~ + BLD + TEN  + MV + PUMA,
+  formula = leadrisk~ BLD + TEN  + MV + PUMA,
   family = quasibinomial(),
   design = logit_survey_design
 )
@@ -236,7 +236,7 @@ summary_2x2 <-
       "No (No lead risk)"
     ),
     predicted_leadrisk = ifelse(
-      predicted_score >= .1,
+      predicted_score > .1,
       as.numeric(WGTP),
       0
     ),
@@ -256,4 +256,4 @@ summary_2x2 <-
 ```{r}
 summary_2x2
 ```
-##The number of kits mailed out increased to 13,000 kits and the number of at risk kids that did not receive kits decreased by 286. I would predict a similar success rate for how many kits would end up at target housholds (70%-80%.) The percent of at risk children likly to be reached would increase by 3% to 25%. 
+##The number of kits mailed out increased to 13,000 kits and the number of at risk kids that did not receive kits decreased by 286. I would predict a similar success rate for how many kits would end up at target housholds. 

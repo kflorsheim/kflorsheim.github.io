@@ -65,7 +65,7 @@ selectInput(
               "Elec- Commercial", 
               "Gas- Residential",
               "Gas- Commercial"),
-  selected = 2020 #"Elec- Residential"
+  selected ="Elec- Residential"
 )
 ```
 
